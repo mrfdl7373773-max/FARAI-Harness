@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -37,13 +38,17 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun current(): AppSettings = settings.first()
 
-    suspend fun update(transform: (AppSettings) -> AppSettings) {
+    /** Serialises read-transform-write, so two quick updates (e.g. Save then completeOnboarding) never overwrite each other. */
+    private val updateLock = kotlinx.coroutines.sync.Mutex()
+
+    suspend fun update(transform: (AppSettings) -> AppSettings): Unit = updateLock.withLock {
         val before = current()
         val after = transform(before)
         if (after.provider.apiKey != before.provider.apiKey) {
             withContext(Dispatchers.IO) { secure.apiKey = after.provider.apiKey }
         }
         store.edit { write(it, after) }
+        lastKnown = after
         mirror(after)
     }
 
