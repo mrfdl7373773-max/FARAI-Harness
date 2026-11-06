@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FARAI Harness</string>
+    <string name="notification_channel_name">Agent notifications</string>
+    <string name="notification_channel_description">Notifications posted by the agent through the notification_post tool</string>
+</resources>
