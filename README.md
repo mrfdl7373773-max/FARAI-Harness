@@ -37,7 +37,7 @@ FARAI turns your phone into a place where real software gets built. It reads and
 3. Add your provider: any OpenAI-compatible API (OpenRouter, Groq, DeepSeek, a local Ollama or LM Studio server…), your API key, and a model.
 
 > [!NOTE]
-> 2.0 is the first public release. It is an early preview, so expect rough edges and please report what you find.
+> 2.0 is the first public release. It is an early preview, so expect rough edges.
 
 ### Features
 
@@ -102,10 +102,6 @@ app/src/main/assets/defaults/prompts/   every instruction the model receives
 - Signed release builds
 - More languages for the app
 
-### Contributing
-
-Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open one.
-
 ### License
 
 [MIT](LICENSE). Third-party notices are in [THIRD_PARTY.md](THIRD_PARTY.md).
@@ -123,7 +119,7 @@ FARAI mengubah HP kamu jadi tempat membuat software sungguhan. FARAI bisa membac
 3. Tambahkan provider: API apa pun yang kompatibel dengan OpenAI (OpenRouter, Groq, DeepSeek, server Ollama atau LM Studio lokal…), API key, dan model.
 
 > [!NOTE]
-> 2.0 adalah rilis publik pertama. Ini masih pratinjau awal, jadi mungkin ada yang belum mulus. Laporkan kalau kamu menemukan masalah.
+> 2.0 adalah rilis publik pertama. Ini masih pratinjau awal, jadi mungkin ada yang belum mulus.
 
 ### Fitur
 
@@ -169,10 +165,6 @@ Butuh JDK 17 dan Android SDK (platform 34). Perintahnya sama seperti di bagian E
 - Pengujian di lebih banyak perangkat dan versi Android
 - Build rilis yang ditandatangani (signed)
 - Lebih banyak bahasa untuk aplikasi
-
-### Kontribusi
-
-Issue dan pull request sangat diterima. Baca [CONTRIBUTING.md](CONTRIBUTING.md) sebelum membuatnya.
 
 ### Lisensi
 
