@@ -281,7 +281,16 @@ fun ChatScreen(
                 placeholder = if (ui.running) tr("Working… type to queue a note") else tr("Message FARAI"),
                 agentLabel = agentDef?.label ?: ui.agent.replaceFirstChar { it.uppercase() },
                 model = ui.model.ifBlank { settings.provider.model },
-                effort = settings.provider.reasoningEffort,
+                effort = run {
+                    val RE = dev.harness.net.ReasoningEffort
+                    val lv = RE.levelsFor(settings.provider.copy(model = ui.model.ifBlank { settings.provider.model }))
+                    val e = RE.normalize(settings.provider.reasoningEffort)
+                    when {
+                        lv != null && lv.isEmpty() -> null
+                        e == null -> "Auto"
+                        else -> RE.label(lv?.let { RE.nearest(e, it) } ?: e)
+                    }
+                },
                 onPlus = { if (!input.text.startsWith("/")) input = TextFieldValue("/", TextRange(1)) },
                 onChips = { runSheet = true },
                 onSend = {
@@ -297,6 +306,7 @@ fun ChatScreen(
         agents = ui.agents.map { Triple(it.name, it.label, it.description) },
         agent = ui.agent,
         effort = settings.provider.reasoningEffort,
+        effortLevels = dev.harness.net.ReasoningEffort.levelsFor(settings.provider.copy(model = ui.model.ifBlank { settings.provider.model })),
         model = ui.model.ifBlank { settings.provider.model },
         onAgent = { vm.setAgent(it) },
         onEffort = { vm.send("/reasoning ${it.ifEmpty { "default" }}") },
@@ -420,7 +430,7 @@ private fun Composer(
     placeholder: String,
     agentLabel: String,
     model: String,
-    effort: String,
+    effort: String?,
     onPlus: () -> Unit,
     onChips: () -> Unit,
     onSend: () -> Unit,
@@ -473,7 +483,7 @@ private fun Composer(
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     ContextChip(agentLabel, { Spark(14.dp, live = running) }, onChips)
                     ContextChip(model.substringAfterLast('/').ifBlank { "Model" }, { Icon(Icons.Rounded.Memory, null, tint = c.secondaryLabel, modifier = Modifier.size(15.dp)) }, onChips)
-                    ContextChip(effort.ifEmpty { "Auto" }.replaceFirstChar { it.uppercase() }, { Icon(Icons.Rounded.Tune, null, tint = c.secondaryLabel, modifier = Modifier.size(15.dp)) }, onChips)
+                    if (effort != null) ContextChip(effort, { Icon(Icons.Rounded.Tune, null, tint = c.secondaryLabel, modifier = Modifier.size(15.dp)) }, onChips)
                 }
                 Spacer(Modifier.width(6.dp))
                 SendButton(running = running && !editing, hasText = value.text.isNotBlank(), onClick = onSend)
@@ -533,6 +543,7 @@ private fun RunSheet(
     agents: List<Triple<String, String, String>>,
     agent: String,
     effort: String,
+    effortLevels: List<String>?,
     model: String,
     onAgent: (String) -> Unit,
     onEffort: (String) -> Unit,
@@ -568,14 +579,43 @@ private fun RunSheet(
             }
 
             SheetLabel("Reasoning")
-            val levels = listOf("" to "Auto", "low" to "Low", "medium" to "Medium", "high" to "High")
-            dev.harness.ui.components.SegmentedControl(
-                options = levels.map { it.second },
-                selected = levels.indexOfFirst { it.first == effort }.let { if (it < 0) 0 else it },
-                onSelect = { onEffort(levels[it].first) },
-            )
-            if (effort.isNotEmpty() && levels.none { it.first == effort }) {
-                Text(trf("Currently “{0}” (set with /reasoning).", effort), style = Harness.type.footnote, color = c.secondaryLabel, modifier = Modifier.padding(start = 8.dp, top = 6.dp))
+            val RE = dev.harness.net.ReasoningEffort
+            val modelLevels = effortLevels
+            if (modelLevels != null && modelLevels.isEmpty()) {
+                Text(tr("This model has no reasoning setting."), style = Harness.type.footnote, color = c.secondaryLabel, modifier = Modifier.padding(start = 8.dp, top = 2.dp))
+            } else {
+                val shown = modelLevels ?: listOf("low", "medium", "high")
+                val levels = listOf("" to "Auto") + shown.map { it to RE.label(it) }
+                val sent = RE.normalize(effort)?.let { e -> modelLevels?.let { RE.nearest(e, it) } ?: e }
+                val selected = levels.indexOfFirst { it.first == sent }.let { if (it < 0) 0 else it }
+                if (levels.size <= 5) {
+                    dev.harness.ui.components.SegmentedControl(
+                        options = levels.map { it.second },
+                        selected = selected,
+                        onSelect = { onEffort(levels[it].first) },
+                    )
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        levels.forEachIndexed { i, (value, label) ->
+                            val on = i == selected
+                            val bg by animateColorAsState(if (on) c.accent else c.surfaceElevated, label = "effortPill")
+                            val fg by animateColorAsState(if (on) Color.White else c.label, label = "effortPillText")
+                            Box(
+                                Modifier.height(40.dp).clip(CircleShape).background(bg).clickable { onEffort(value) }.padding(horizontal = 16.dp),
+                                contentAlignment = Alignment.Center,
+                            ) { Text(label, style = Harness.type.label.copy(fontWeight = FontWeight.SemiBold), color = fg, maxLines = 1) }
+                        }
+                    }
+                }
+                val note = when {
+                    modelLevels == null && effort.isNotEmpty() && levels.none { it.first == effort } -> trf("Currently “{0}” (set with /reasoning).", effort)
+                    modelLevels != null -> trf("Up to {0} on this model.", RE.label(modelLevels.last()))
+                    else -> null
+                }
+                if (note != null) Text(note, style = Harness.type.footnote, color = c.secondaryLabel, modifier = Modifier.padding(start = 8.dp, top = 6.dp))
             }
 
             SheetLabel("Model")

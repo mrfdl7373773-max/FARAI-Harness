@@ -71,9 +71,13 @@ class ReasoningCommand : Command {
         // Accept "/reasoning high" and "/reasoning effort high".
         val words = inv.rawArgs.trim().split(Regex("\\s+")).filter { it.isNotEmpty() && it.lowercase() != "effort" }
         val p = ctx.settings().provider
-        val known = RE.knownLevels(p)
+        val known = RE.levelsFor(p)
+        val modelKnown = RE.modelLevels(p.model)
         val levelsLine = "Levels: " + RE.LEVELS.joinToString(", ") { "`$it`" } + ", or `default`."
-        val hint = when (RE.dialect(p)) {
+        val hint = if (modelKnown != null) {
+            if (modelKnown.isEmpty()) "`${p.model}` has no reasoning setting, so none is sent."
+            else "`${p.model}` takes ${modelKnown.joinToString(", ") { "`$it`" }} (up to `${modelKnown.last()}`); other levels are sent as the nearest one."
+        } else when (RE.dialect(p)) {
             dev.harness.net.ReasoningEffort.Dialect.OPENROUTER -> "OpenRouter maps the level to the nearest one the model supports."
             dev.harness.net.ReasoningEffort.Dialect.GEMINI -> "Gemini accepts ${known!!.joinToString(", ")}; higher levels are sent as `high`."
             dev.harness.net.ReasoningEffort.Dialect.ANTHROPIC -> "Claude accepts ${known!!.joinToString(", ")}."
@@ -97,7 +101,11 @@ class ReasoningCommand : Command {
         val level = RE.normalize(arg) ?: return CommandResult.Error("Unknown level `$arg`. $levelsLine")
         ctx.updateSettings { it.copy(provider = it.provider.copy(reasoningEffort = level)) }
         val sent = known?.let { RE.nearest(level, it) }
-        val note = if (sent != null && sent != level) " This provider doesn't take `$level`, so `$sent` is sent." else ""
+        val note = when {
+            known != null && known.isEmpty() -> " This model has no reasoning setting, so nothing is sent."
+            sent != null && sent != level -> " This model doesn't take `$level`, so `$sent` is sent."
+            else -> ""
+        }
         return CommandResult.Output("Reasoning effort set to `$level`.$note The next message uses it.")
     }
 }

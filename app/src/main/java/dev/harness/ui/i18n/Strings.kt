@@ -56,6 +56,8 @@ private val ID: Map<String, String> = hashMapOf(
         "Send" to "Kirim",
         "Who works, how hard it thinks, and on which model." to "Siapa yang kerja, seberapa keras mikirnya, dan pakai model apa.",
         "Currently “{0}” (set with /reasoning)." to "Sekarang “{0}” (atur pakai /reasoning).",
+        "This model has no reasoning setting." to "Model ini nggak punya pengaturan reasoning.",
+        "Up to {0} on this model." to "Maksimal {0} di model ini.",
         "Not set" to "Belum diatur",
         "Change provider and model" to "Ganti provider dan model",
         "Explain this project" to "Jelasin project ini",

@@ -38,4 +38,29 @@ class ReasoningEffortTest {
         assertEquals("high", ReasoningEffort.nearest("max", listOf("low", "medium", "high")))
         assertNull(ReasoningEffort.nearest("high", emptyList()))
     }
+
+    @Test fun levelsFollowTheModel() {
+        val m = ReasoningEffort::modelLevels
+        assertEquals("high", m("openai/gpt-5-mini")!!.last())
+        assertEquals("minimal", m("gpt-5")!!.first())
+        assertEquals("xhigh", m("gpt-5.2")!!.last())
+        assertEquals(listOf("none", "low", "medium", "high"), m("gpt-5.1"))
+        assertEquals("max", m("anthropic/claude-opus-4.6")!!.last())
+        assertEquals("max", m("claude-opus-4-7")!!.last())
+        assertTrue("xhigh" in m("claude-opus-4-7")!!)
+        assertEquals("high", m("claude-sonnet-4-20250514")!!.last())
+        assertEquals("high", m("anthropic/claude-3.7-sonnet:thinking")!!.last())
+        assertTrue(m("claude-3-5-sonnet-20241022")!!.isEmpty())
+        assertTrue(m("openai/gpt-4o")!!.isEmpty())
+        assertEquals(listOf("low", "high"), m("google/gemini-3-pro-preview"))
+        assertEquals("high", m("o4-mini")!!.last())
+        assertNull(m("some-new-model"))
+    }
+
+    @Test fun requestClampsToModel() {
+        val gpt = ProviderSettings(baseUrl = "https://openrouter.ai/api/v1", model = "openai/gpt-5.1", reasoningEffort = "max")
+        assertEquals("high", ReasoningEffort.forRequest(gpt))
+        val plain = ProviderSettings(baseUrl = "https://api.openai.com/v1", model = "gpt-4o", reasoningEffort = "high")
+        assertNull(ReasoningEffort.forRequest(plain))
+    }
 }

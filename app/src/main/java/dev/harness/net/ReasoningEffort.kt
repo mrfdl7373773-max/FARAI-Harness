@@ -53,11 +53,72 @@ object ReasoningEffort {
         Dialect.OPENAI -> null
     }
 
-    /** The effort to send for these settings, already clamped to what the provider is known to take. */
+    /**
+     * Levels this model is known to take, lowest to highest, read from its id (a vendor prefix like
+     * "openai/" and a ":free" style suffix are ignored). An empty list means the model has no
+     * reasoning setting; null means the model is unknown, so the UI falls back to Low/Medium/High.
+     */
+    fun modelLevels(model: String): List<String>? {
+        val id = model.trim().lowercase().substringAfterLast('/').substringBefore(':')
+        if (id.isEmpty()) return null
+        fun has(vararg parts: String) = parts.any { it in id }
+        val lmh = listOf("low", "medium", "high")
+        return when {
+            // OpenAI
+            has("gpt-5") && has("-chat") -> emptyList()
+            has("gpt-5") -> {
+                val v = Regex("gpt-5\\.(\\d+)").find(id)?.groupValues?.get(1)?.let { 5 + it.toDouble() / 10.0 } ?: 5.0
+                when {
+                    id.endsWith("-max") -> listOf("low", "medium", "high", "xhigh")
+                    v >= 5.2 -> listOf("none", "low", "medium", "high", "xhigh")
+                    v >= 5.1 -> listOf("none", "low", "medium", "high")
+                    else -> listOf("minimal", "low", "medium", "high")
+                }
+            }
+            Regex("^o[1-9](-|$)").containsMatchIn(id) -> lmh
+            has("gpt-4", "gpt-3.5", "chatgpt-4o") -> emptyList()
+            // Anthropic
+            has("claude") -> {
+                val v = Regex("(\\d+)[.-](\\d)(?!\\d)").find(id.substringAfter("claude"))?.let { "${it.groupValues[1]}.${it.groupValues[2]}".toDoubleOrNull() }
+                    ?: Regex("-(\\d)(?:-|$)").find(id.substringAfter("claude"))?.groupValues?.get(1)?.toDoubleOrNull()
+                when {
+                    v == null -> null
+                    v < 3.7 -> emptyList()
+                    has("opus") && v >= 4.7 -> listOf("low", "medium", "high", "xhigh", "max")
+                    v >= 4.6 && has("opus", "sonnet") -> listOf("low", "medium", "high", "max")
+                    else -> lmh
+                }
+            }
+            // Google
+            has("gemini-3") && has("flash") -> listOf("minimal", "low", "medium", "high")
+            has("gemini-3.1") -> lmh
+            has("gemini-3") -> listOf("low", "high")
+            has("gemini-2.5") && has("pro") -> lmh
+            has("gemini-2.5") -> listOf("none", "low", "medium", "high")
+            has("gemini-2.0", "gemini-1.5", "gemma") -> emptyList()
+            // xAI
+            has("grok-3-mini") -> listOf("low", "high")
+            else -> null
+        }
+    }
+
+    /** Levels to offer for these settings: the model's own, else what the provider takes, else null. */
+    fun levelsFor(p: ProviderSettings): List<String>? = modelLevels(p.model) ?: knownLevels(p)
+
+    /** The effort to send for these settings, already clamped to what the model or provider is known to take. */
     fun forRequest(p: ProviderSettings): String? {
         val e = normalize(p.reasoningEffort) ?: return null
-        val known = knownLevels(p) ?: return e
+        val known = levelsFor(p) ?: return e
+        if (known.isEmpty()) return null
         return nearest(e, known)
+    }
+
+    /** Short label for a level, as the UI shows it. */
+    fun label(level: String): String = when (level) {
+        "none" -> "Off"
+        "minimal" -> "Minimal"
+        "xhigh" -> "XHigh"
+        else -> level.replaceFirstChar { it.uppercase() }
     }
 
     /** Adds the effort to an encoded request in this provider's shape. */
